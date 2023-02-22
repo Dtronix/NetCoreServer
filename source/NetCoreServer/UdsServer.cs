@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using NetCoreServer.Configs;
 
 namespace NetCoreServer
 {
@@ -12,18 +13,27 @@ namespace NetCoreServer
     /// Unix Domain Socket server is used to connect, disconnect and manage Unix Domain Socket sessions
     /// </summary>
     /// <remarks>Thread-safe</remarks>
-    public class UdsServer : IDisposable
+    internal sealed class UdsServer : IDisposable
     {
+        private readonly UdsServerConfig _config;
+        private readonly ServerEvents<UdsSession> _events;
+
+        public UdsServer(UdsServerConfig config) : this(config.UdsEndpoint)
+        {
+            _config = config;
+            _events = config.Events;
+        }
+
         /// <summary>
         /// Initialize Unix Domain Socket server with a given socket path
         /// </summary>
         /// <param name="path">Socket path</param>
-        public UdsServer(string path) : this(new UnixDomainSocketEndPoint(path)) {}
+        private UdsServer(string path) : this(new UnixDomainSocketEndPoint(path)) {}
         /// <summary>
         /// Initialize Unix Domain Socket server with a given Unix Domain Socket endpoint
         /// </summary>
         /// <param name="endpoint">Unix Domain Socket endpoint</param>
-        public UdsServer(UnixDomainSocketEndPoint endpoint)
+        private UdsServer(UnixDomainSocketEndPoint endpoint)
         {
             Id = Guid.NewGuid();
             Endpoint = endpoint;
@@ -43,6 +53,7 @@ namespace NetCoreServer
         /// Number of sessions connected to the server
         /// </summary>
         public long ConnectedSessions { get { return Sessions.Count; } }
+        /*
         /// <summary>
         /// Number of bytes pending sent by the server
         /// </summary>
@@ -55,7 +66,7 @@ namespace NetCoreServer
         /// Number of bytes received by the server
         /// </summary>
         public long BytesReceived { get { return _bytesReceived; } }
-
+        */
         /// <summary>
         /// Option: acceptor backlog size
         /// </summary>
@@ -77,12 +88,12 @@ namespace NetCoreServer
         // Server acceptor
         private Socket _acceptorSocket;
         private SocketAsyncEventArgs _acceptorEventArg;
-
+        /*
         // Server statistic
         internal long _bytesPending;
         internal long _bytesSent;
         internal long _bytesReceived;
-
+        */
         /// <summary>
         /// Is the server started?
         /// </summary>
@@ -99,7 +110,7 @@ namespace NetCoreServer
         /// Method may be override if you need to prepare some specific socket object in your implementation.
         /// </remarks>
         /// <returns>Socket object</returns>
-        protected virtual Socket CreateSocket()
+        private Socket CreateSocket()
         {
             return new Socket(Endpoint.AddressFamily, SocketType.Stream, ProtocolType.IP);
         }
@@ -108,7 +119,7 @@ namespace NetCoreServer
         /// Start the server
         /// </summary>
         /// <returns>'true' if the server was successfully started, 'false' if the server failed to start</returns>
-        public virtual bool Start()
+        public bool Start()
         {
             Debug.Assert(!IsStarted, "Unix Domain Socket server is already started!");
             if (IsStarted)
@@ -130,21 +141,23 @@ namespace NetCoreServer
             Endpoint = _acceptorSocket.LocalEndPoint;
 
             // Call the server starting handler
-            OnStarting();
+            //OnStarting();
+            _events.OnStartingInternal?.Invoke();
 
             // Start listen to the acceptor socket with the given accepting backlog size
             _acceptorSocket.Listen(OptionAcceptorBacklog);
-
+            /*
             // Reset statistic
             _bytesPending = 0;
             _bytesSent = 0;
             _bytesReceived = 0;
-
+            */
             // Update the started flag
             IsStarted = true;
 
             // Call the server started handler
-            OnStarted();
+            //OnStarted();
+            _events.OnStartedInternal?.Invoke();
 
             // Perform the first server accept
             IsAccepting = true;
@@ -157,7 +170,7 @@ namespace NetCoreServer
         /// Stop the server
         /// </summary>
         /// <returns>'true' if the server was successfully stopped, 'false' if the server is already stopped</returns>
-        public virtual bool Stop()
+        public bool Stop()
         {
             Debug.Assert(IsStarted, "Unix Domain Socket server is not started!");
             if (!IsStarted)
@@ -170,7 +183,8 @@ namespace NetCoreServer
             _acceptorEventArg.Completed -= OnAsyncCompleted;
 
             // Call the server stopping handler
-            OnStopping();
+            //OnStopping();
+            _events.OnStoppingInternal?.Invoke();
 
             try
             {
@@ -195,7 +209,8 @@ namespace NetCoreServer
             IsStarted = false;
 
             // Call the server stopped handler
-            OnStopped();
+            //OnStopped();
+            _events.OnStoppedInternal?.Invoke();
 
             return true;
         }
@@ -204,7 +219,7 @@ namespace NetCoreServer
         /// Restart the server
         /// </summary>
         /// <returns>'true' if the server was successfully restarted, 'false' if the server failed to restart</returns>
-        public virtual bool Restart()
+        public bool Restart()
         {
             if (!Stop())
                 return false;
@@ -240,7 +255,8 @@ namespace NetCoreServer
             if (e.SocketError == SocketError.Success)
             {
                 // Create a new session to register
-                var session = CreateSession();
+                //var session = CreateSession();
+                var session = _events.CreateSessionInternal();
 
                 // Register the session
                 RegisterSession(session);
@@ -271,25 +287,25 @@ namespace NetCoreServer
         #endregion
 
         #region Session factory
-
+        /*
         /// <summary>
         /// Create Unix Domain Socket session factory method
         /// </summary>
         /// <returns>Unix Domain Socket session</returns>
         protected virtual UdsSession CreateSession() { return new UdsSession(this); }
-
+        */
         #endregion
 
         #region Session management
 
         // Server sessions
-        protected readonly ConcurrentDictionary<Guid, UdsSession> Sessions = new ConcurrentDictionary<Guid, UdsSession>();
+        protected readonly ConcurrentDictionary<long, UdsSession> Sessions = new ConcurrentDictionary<long, UdsSession>();
 
         /// <summary>
         /// Disconnect all connected sessions
         /// </summary>
         /// <returns>'true' if all sessions were successfully disconnected, 'false' if the server is not started</returns>
-        public virtual bool DisconnectAll()
+        public bool DisconnectAll()
         {
             if (!IsStarted)
                 return false;
@@ -306,7 +322,7 @@ namespace NetCoreServer
         /// </summary>
         /// <param name="id">Session Id</param>
         /// <returns>Session with a given Id or null if the session it not connected</returns>
-        public UdsSession FindSession(Guid id)
+        public UdsSession FindSession(long id)
         {
             // Try to find the required session
             return Sessions.TryGetValue(id, out UdsSession result) ? result : null;
@@ -326,7 +342,7 @@ namespace NetCoreServer
         /// Unregister session by Id
         /// </summary>
         /// <param name="id">Session Id</param>
-        internal void UnregisterSession(Guid id)
+        internal void UnregisterSession(long id)
         {
             // Unregister session by Id
             Sessions.TryRemove(id, out UdsSession _);
@@ -335,13 +351,13 @@ namespace NetCoreServer
         #endregion
 
         #region Multicasting
-
+        /*
         /// <summary>
         /// Multicast data to all connected sessions
         /// </summary>
         /// <param name="buffer">Buffer to multicast</param>
         /// <returns>'true' if the data was successfully multicasted, 'false' if the data was not multicasted</returns>
-        public virtual bool Multicast(byte[] buffer) => Multicast(buffer.AsSpan());
+        public bool Multicast(byte[] buffer) => Multicast(buffer.AsSpan());
 
         /// <summary>
         /// Multicast data to all connected clients
@@ -350,14 +366,14 @@ namespace NetCoreServer
         /// <param name="offset">Buffer offset</param>
         /// <param name="size">Buffer size</param>
         /// <returns>'true' if the data was successfully multicasted, 'false' if the data was not multicasted</returns>
-        public virtual bool Multicast(byte[] buffer, long offset, long size) => Multicast(buffer.AsSpan((int)offset, (int)size));
-
+        public bool Multicast(byte[] buffer, long offset, long size) => Multicast(buffer.AsSpan((int)offset, (int)size));
+        */
         /// <summary>
         /// Multicast data to all connected clients
         /// </summary>
         /// <param name="buffer">Buffer to send as a span of bytes</param>
         /// <returns>'true' if the data was successfully multicasted, 'false' if the data was not multicasted</returns>
-        public virtual bool Multicast(ReadOnlySpan<byte> buffer)
+        public bool Multicast(ReadOnlySpan<byte> buffer)
         {
             if (!IsStarted)
                 return false;
@@ -371,25 +387,25 @@ namespace NetCoreServer
 
             return true;
         }
-
+        /*
         /// <summary>
         /// Multicast text to all connected clients
         /// </summary>
         /// <param name="text">Text string to multicast</param>
         /// <returns>'true' if the text was successfully multicasted, 'false' if the text was not multicasted</returns>
-        public virtual bool Multicast(string text) => Multicast(Encoding.UTF8.GetBytes(text));
+        public bool Multicast(string text) => Multicast(Encoding.UTF8.GetBytes(text));
 
         /// <summary>
         /// Multicast text to all connected clients
         /// </summary>
         /// <param name="text">Text to multicast as a span of characters</param>
         /// <returns>'true' if the text was successfully multicasted, 'false' if the text was not multicasted</returns>
-        public virtual bool Multicast(ReadOnlySpan<char> text) => Multicast(Encoding.UTF8.GetBytes(text.ToArray()));
-
+        public bool Multicast(ReadOnlySpan<char> text) => Multicast(Encoding.UTF8.GetBytes(text.ToArray()));
+        *
         #endregion
 
         #region Server handlers
-
+        /*
         /// <summary>
         /// Handle server starting notification
         /// </summary>
@@ -438,7 +454,7 @@ namespace NetCoreServer
         internal void OnConnectedInternal(UdsSession session) { OnConnected(session); }
         internal void OnDisconnectingInternal(UdsSession session) { OnDisconnecting(session); }
         internal void OnDisconnectedInternal(UdsSession session) { OnDisconnected(session); }
-
+        */
         #endregion
 
         #region Error handling
@@ -449,6 +465,7 @@ namespace NetCoreServer
         /// <param name="error">Socket error code</param>
         private void SendError(SocketError error)
         {
+            _events.OnSendErrorInternal?.Invoke(error);
             // Skip disconnect errors
             if ((error == SocketError.ConnectionAborted) ||
                 (error == SocketError.ConnectionRefused) ||
@@ -457,7 +474,8 @@ namespace NetCoreServer
                 (error == SocketError.Shutdown))
                 return;
 
-            OnError(error);
+            //OnError(error);
+            _events.OnErrorInternal?.Invoke(error);
         }
 
         #endregion
@@ -481,7 +499,7 @@ namespace NetCoreServer
             GC.SuppressFinalize(this);
         }
 
-        protected virtual void Dispose(bool disposingManagedResources)
+        private void Dispose(bool disposingManagedResources)
         {
             // The idea here is that Dispose(Boolean) knows whether it is
             // being called to do explicit cleanup (the Boolean is true)

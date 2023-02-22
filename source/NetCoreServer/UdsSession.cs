@@ -2,6 +2,7 @@ using System;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using NetCoreServer.Configs;
 
 namespace NetCoreServer
 {
@@ -9,8 +10,18 @@ namespace NetCoreServer
     /// Unix Domain Socket session is used to read and write data from the connected Unix Domain Socket client
     /// </summary>
     /// <remarks>Thread-safe</remarks>
-    public class UdsSession : IDisposable
+    internal sealed class UdsSession : IDisposable
     {
+        private readonly UdsServerConfig _config;
+        private readonly ServerEvents<UdsSession> _events;
+        public UdsSession(UdsServerConfig config, UdsServer server)
+        {
+            _config = config;
+            _events = config.Events;
+            Id = config.GetNewSessionId();
+        }
+
+        /*
         /// <summary>
         /// Initialize the session with a given server
         /// </summary>
@@ -22,11 +33,11 @@ namespace NetCoreServer
             OptionReceiveBufferSize = server.OptionReceiveBufferSize;
             OptionSendBufferSize = server.OptionSendBufferSize;
         }
-
+        */
         /// <summary>
         /// Session Id
         /// </summary>
-        public Guid Id { get; }
+        public long Id { get; }
 
         /// <summary>
         /// Server
@@ -53,7 +64,7 @@ namespace NetCoreServer
         /// Number of bytes received by the session
         /// </summary>
         public long BytesReceived { get; private set; }
-
+        /*
         /// <summary>
         /// Option: receive buffer limit
         /// </summary>
@@ -70,7 +81,7 @@ namespace NetCoreServer
         /// Option: send buffer size
         /// </summary>
         public int OptionSendBufferSize { get; set; } = 8192;
-
+        */
         #region Connect/Disconnect session
 
         /// <summary>
@@ -88,11 +99,16 @@ namespace NetCoreServer
 
             // Update the session socket disposed flag
             IsSocketDisposed = false;
-
+            /*
             // Setup buffers
             _receiveBuffer = new Buffer();
             _sendBufferMain = new Buffer();
             _sendBufferFlush = new Buffer();
+            */
+            if (!_config.MemoryPool.TryRent(out _receiveBuffer) ||
+                !_config.MemoryPool.TryRent(out _sendBufferMain) ||
+                !_config.MemoryPool.TryRent(out _sendBufferFlush))
+                throw new InvalidOperationException("Memory pool depleted.");
 
             // Setup event args
             _receiveEventArg = new SocketAsyncEventArgs();
@@ -100,10 +116,12 @@ namespace NetCoreServer
             _sendEventArg = new SocketAsyncEventArgs();
             _sendEventArg.Completed += OnAsyncCompleted;
 
+            /*
             // Prepare receive & send buffers
             _receiveBuffer.Reserve(OptionReceiveBufferSize);
             _sendBufferMain.Reserve(OptionSendBufferSize);
             _sendBufferFlush.Reserve(OptionSendBufferSize);
+            */
 
             // Reset statistic
             BytesPending = 0;
@@ -115,7 +133,8 @@ namespace NetCoreServer
             OnConnecting();
 
             // Call the session connecting handler in the server
-            Server.OnConnectingInternal(this);
+            //Server.OnConnectingInternal(this);
+            _events.OnConnectingInternal?.Invoke(this);
 
             // Update the connected flag
             IsConnected = true;
@@ -131,7 +150,8 @@ namespace NetCoreServer
             OnConnected();
 
             // Call the session connected handler in the server
-            Server.OnConnectedInternal(this);
+            //Server.OnConnectedInternal(this);
+            _events.OnConnectedInternal?.Invoke(this);
 
             // Call the empty send buffer handler
             if (_sendBufferMain.IsEmpty)
@@ -142,7 +162,7 @@ namespace NetCoreServer
         /// Disconnect the session
         /// </summary>
         /// <returns>'true' if the section was successfully disconnected, 'false' if the section is already disconnected</returns>
-        public virtual bool Disconnect()
+        public bool Disconnect()
         {
             if (!IsConnected)
                 return false;
@@ -155,7 +175,8 @@ namespace NetCoreServer
             OnDisconnecting();
 
             // Call the session disconnecting handler in the server
-            Server.OnDisconnectingInternal(this);
+            //Server.OnDisconnectingInternal(this);
+            _events.OnDisconnectingInternal?.Invoke(this);
 
             try
             {
@@ -195,7 +216,8 @@ namespace NetCoreServer
             OnDisconnected();
 
             // Call the session disconnected handler in the server
-            Server.OnDisconnectedInternal(this);
+            //Server.OnDisconnectedInternal(this);
+            _events.OnDisconnected?.Invoke(this);
 
             // Unregister session
             Server.UnregisterSession(Id);
@@ -209,22 +231,22 @@ namespace NetCoreServer
 
         // Receive buffer
         private bool _receiving;
-        private Buffer _receiveBuffer;
+        private MemoryBuffer<byte> _receiveBuffer;
         private SocketAsyncEventArgs _receiveEventArg;
         // Send buffer
         private readonly object _sendLock = new object();
         private bool _sending;
-        private Buffer _sendBufferMain;
-        private Buffer _sendBufferFlush;
+        private MemoryBuffer<byte> _sendBufferMain;
+        private MemoryBuffer<byte> _sendBufferFlush;
         private SocketAsyncEventArgs _sendEventArg;
         private long _sendBufferFlushOffset;
-
+        /*
         /// <summary>
         /// Send data to the client (synchronous)
         /// </summary>
         /// <param name="buffer">Buffer to send</param>
         /// <returns>Size of sent data</returns>
-        public virtual long Send(byte[] buffer) => Send(buffer.AsSpan());
+        public long Send(byte[] buffer) => Send(buffer.AsSpan());
 
         /// <summary>
         /// Send data to the client (synchronous)
@@ -233,7 +255,7 @@ namespace NetCoreServer
         /// <param name="offset">Buffer offset</param>
         /// <param name="size">Buffer size</param>
         /// <returns>Size of sent data</returns>
-        public virtual long Send(byte[] buffer, long offset, long size) => Send(buffer.AsSpan((int)offset, (int)size));
+        public long Send(byte[] buffer, long offset, long size) => Send(buffer.AsSpan((int)offset, (int)size));
 
         /// <summary>
         /// Send data to the client (synchronous)
@@ -276,13 +298,13 @@ namespace NetCoreServer
         /// <param name="text">Text string to send</param>
         /// <returns>Size of sent data</returns>
         public virtual long Send(string text) => Send(Encoding.UTF8.GetBytes(text));
-
+        
         /// <summary>
         /// Send data to the client (asynchronous)
         /// </summary>
         /// <param name="buffer">Buffer to send</param>
         /// <returns>'true' if the data was successfully sent, 'false' if the session is not connected</returns>
-        public virtual bool SendAsync(byte[] buffer) => SendAsync(buffer.AsSpan());
+        public bool SendAsync(byte[] buffer) => SendAsync(buffer.AsSpan());
 
         /// <summary>
         /// Send data to the client (asynchronous)
@@ -292,13 +314,13 @@ namespace NetCoreServer
         /// <param name="size">Buffer size</param>
         /// <returns>'true' if the data was successfully sent, 'false' if the session is not connected</returns>
         public virtual bool SendAsync(byte[] buffer, long offset, long size) => SendAsync(buffer.AsSpan((int)offset, (int)size));
-
+        */
         /// <summary>
         /// Send data to the client (asynchronous)
         /// </summary>
         /// <param name="buffer">Buffer to send as a span of bytes</param>
         /// <returns>'true' if the data was successfully sent, 'false' if the session is not connected</returns>
-        public virtual bool SendAsync(ReadOnlySpan<byte> buffer)
+        public bool SendAsync(ReadOnlySpan<byte> buffer)
         {
             if (!IsConnected)
                 return false;
@@ -309,7 +331,7 @@ namespace NetCoreServer
             lock (_sendLock)
             {
                 // Check the send buffer limit
-                if (((_sendBufferMain.Size + buffer.Length) > OptionSendBufferLimit) && (OptionSendBufferLimit > 0))
+                if (((_sendBufferMain.Size + buffer.Length) > _config.SendReceiveBufferSize))
                 {
                     SendError(SocketError.NoBufferSpaceAvailable);
                     return false;
@@ -333,7 +355,7 @@ namespace NetCoreServer
 
             return true;
         }
-
+        /*
         /// <summary>
         /// Send text to the client (asynchronous)
         /// </summary>
@@ -391,7 +413,7 @@ namespace NetCoreServer
 
             return received;
         }
-
+        
         /// <summary>
         /// Receive text from the client (synchronous)
         /// </summary>
@@ -403,11 +425,11 @@ namespace NetCoreServer
             var length = Receive(buffer);
             return Encoding.UTF8.GetString(buffer, 0, (int)length);
         }
-
+        */
         /// <summary>
         /// Receive data from the client (asynchronous)
         /// </summary>
-        public virtual void ReceiveAsync()
+        public void ReceiveAsync()
         {
             // Try to receive data from the client
             TryReceive();
@@ -434,7 +456,8 @@ namespace NetCoreServer
                 {
                     // Async receive with the receive handler
                     _receiving = true;
-                    _receiveEventArg.SetBuffer(_receiveBuffer.Data, 0, (int)_receiveBuffer.Capacity);
+                    //_receiveEventArg.SetBuffer(_receiveBuffer.Data, 0, (int)_receiveBuffer.Capacity);
+                    _receiveEventArg.SetBuffer(_receiveBuffer.Contents);
                     if (!Socket.ReceiveAsync(_receiveEventArg))
                         process = ProcessReceive(_receiveEventArg);
                 }
@@ -494,7 +517,8 @@ namespace NetCoreServer
                 try
                 {
                     // Async write with the write handler
-                    _sendEventArg.SetBuffer(_sendBufferFlush.Data, (int)_sendBufferFlushOffset, (int)(_sendBufferFlush.Size - _sendBufferFlushOffset));
+                    //_sendEventArg.SetBuffer(_sendBufferFlush.Data, (int)_sendBufferFlushOffset, (int)(_sendBufferFlush.Size - _sendBufferFlushOffset));
+                    _sendEventArg.SetBuffer(_sendBufferFlush.Contents);
                     if (!Socket.SendAsync(_sendEventArg))
                         process = ProcessSend(_sendEventArg);
                 }
