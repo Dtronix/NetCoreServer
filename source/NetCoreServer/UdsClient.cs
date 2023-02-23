@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -452,7 +453,48 @@ namespace NetCoreServer
         /// </summary>
         /// <param name="buffer">Buffer to send as a span of bytes</param>
         /// <returns>'true' if the data was successfully sent, 'false' if the client is not connected</returns>
-        public virtual bool SendAsync(ReadOnlySpan<byte> buffer)
+        public bool SendAsync(ReadOnlySpan<byte> buffer)
+        {
+            if (!IsConnected)
+                return false;
+
+            if (buffer.IsEmpty)
+                return true;
+
+            lock (_sendLock)
+            {
+                // Check the send buffer limit
+                if (((_sendBufferMain.Size + buffer.Length) > _context.SendReceiveBufferSize))
+                {
+                    SendError(SocketError.NoBufferSpaceAvailable);
+                    return false;
+                }
+
+                // Fill the main send buffer
+                _sendBufferMain.Append(buffer);
+
+                // Update statistic
+                BytesPending = _sendBufferMain.Size;
+
+                // Avoid multiple send handlers
+                if (_sending)
+                    return true;
+                else
+                    _sending = true;
+
+                // Try to send the main buffer
+                TrySend();
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Send data to the server (asynchronous)
+        /// </summary>
+        /// <param name="buffer">Buffer to send as a span of bytes</param>
+        /// <returns>'true' if the data was successfully sent, 'false' if the client is not connected</returns>
+        public bool SendAsync(ReadOnlySequence<byte> buffer)
         {
             if (!IsConnected)
                 return false;
@@ -501,14 +543,14 @@ namespace NetCoreServer
         /// <param name="text">Text to send as a span of characters</param>
         /// <returns>'true' if the text was successfully sent, 'false' if the client is not connected</returns>
         public virtual bool SendAsync(ReadOnlySpan<char> text) => SendAsync(Encoding.UTF8.GetBytes(text.ToArray()));
-
+        /*
         /// <summary>
         /// Receive data from the server (synchronous)
         /// </summary>
         /// <param name="buffer">Buffer to receive</param>
         /// <returns>Size of received data</returns>
         public virtual long Receive(byte[] buffer) { return Receive(buffer, 0, buffer.Length); }
-
+        
         /// <summary>
         /// Receive data from the server (synchronous)
         /// </summary>
@@ -544,7 +586,7 @@ namespace NetCoreServer
 
             return received;
         }
-
+        
         /// <summary>
         /// Receive text from the server (synchronous)
         /// </summary>
@@ -556,7 +598,7 @@ namespace NetCoreServer
             var length = Receive(buffer);
             return Encoding.UTF8.GetString(buffer, 0, (int)length);
         }
-
+        */
         /// <summary>
         /// Receive data from the server (asynchronous)
         /// </summary>
@@ -879,7 +921,7 @@ namespace NetCoreServer
         /// <remarks>
         /// Notification is called when another chunk of buffer was received from the server
         /// </remarks>
-        protected virtual void OnReceived(byte[] buffer, long offset, long size) {}
+        //protected virtual void OnReceived(byte[] buffer, long offset, long size) {}
         protected virtual void OnReceived(ReadOnlyMemory<byte> buffer) { }
         /// <summary>
         /// Handle buffer sent notification
