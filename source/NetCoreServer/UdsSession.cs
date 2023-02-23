@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using NetCoreServer.Configs;
 
 namespace NetCoreServer
 {
@@ -9,24 +10,32 @@ namespace NetCoreServer
     /// Unix Domain Socket session is used to read and write data from the connected Unix Domain Socket client
     /// </summary>
     /// <remarks>Thread-safe</remarks>
-    public class UdsSession : IDisposable
+    internal class UdsSession : IDisposable
     {
+        private readonly UdsServerContext _context;
+        public UdsSession(UdsServerContext context, UdsServer server)
+        {
+            _context = context;
+            Server = server;
+            Id = context.GetNewSessionId();
+        }
+        /*
         /// <summary>
         /// Initialize the session with a given server
         /// </summary>
         /// <param name="server">Unix Domain Socket server</param>
-        public UdsSession(UdsServer server)
+        private UdsSession(UdsServer server)
         {
             Id = Guid.NewGuid();
             Server = server;
             OptionReceiveBufferSize = server.OptionReceiveBufferSize;
             OptionSendBufferSize = server.OptionSendBufferSize;
         }
-
+        */
         /// <summary>
         /// Session Id
         /// </summary>
-        public Guid Id { get; }
+        public long Id { get; }
 
         /// <summary>
         /// Server
@@ -57,19 +66,20 @@ namespace NetCoreServer
         /// <summary>
         /// Option: receive buffer limit
         /// </summary>
-        public int OptionReceiveBufferLimit { get; set; } = 0;
+        public int OptionReceiveBufferLimit => _context.SendReceiveBufferSize;
+
         /// <summary>
         /// Option: receive buffer size
         /// </summary>
-        public int OptionReceiveBufferSize { get; set; } = 8192;
+        public int OptionReceiveBufferSize => _context.SendReceiveBufferSize;
         /// <summary>
         /// Option: send buffer limit
         /// </summary>
-        public int OptionSendBufferLimit { get; set; } = 0;
+        public int OptionSendBufferLimit => _context.SendReceiveBufferSize;
         /// <summary>
         /// Option: send buffer size
         /// </summary>
-        public int OptionSendBufferSize { get; set; } = 8192;
+        public int OptionSendBufferSize => _context.SendReceiveBufferSize;
 
         #region Connect/Disconnect session
 
@@ -88,23 +98,28 @@ namespace NetCoreServer
 
             // Update the session socket disposed flag
             IsSocketDisposed = false;
-
+            /*
             // Setup buffers
             _receiveBuffer = new Buffer();
             _sendBufferMain = new Buffer();
             _sendBufferFlush = new Buffer();
+            */
+            if (!_context.MemoryPool.TryRent(out _receiveBuffer) ||
+                !_context.MemoryPool.TryRent(out _sendBufferMain) ||
+                !_context.MemoryPool.TryRent(out _sendBufferFlush))
+                throw new InvalidOperationException("Memory pool depleted.");
 
             // Setup event args
             _receiveEventArg = new SocketAsyncEventArgs();
             _receiveEventArg.Completed += OnAsyncCompleted;
             _sendEventArg = new SocketAsyncEventArgs();
             _sendEventArg.Completed += OnAsyncCompleted;
-
+            /*
             // Prepare receive & send buffers
             _receiveBuffer.Reserve(OptionReceiveBufferSize);
             _sendBufferMain.Reserve(OptionSendBufferSize);
             _sendBufferFlush.Reserve(OptionSendBufferSize);
-
+            */
             // Reset statistic
             BytesPending = 0;
             BytesSending = 0;
@@ -209,13 +224,13 @@ namespace NetCoreServer
 
         // Receive buffer
         private bool _receiving;
-        private Buffer _receiveBuffer;
+        private MemoryBuffer<byte> _receiveBuffer;
         private SocketAsyncEventArgs _receiveEventArg;
         // Send buffer
         private readonly object _sendLock = new object();
         private bool _sending;
-        private Buffer _sendBufferMain;
-        private Buffer _sendBufferFlush;
+        private MemoryBuffer<byte> _sendBufferMain;
+        private MemoryBuffer<byte> _sendBufferFlush;
         private SocketAsyncEventArgs _sendEventArg;
         private long _sendBufferFlushOffset;
 
@@ -434,7 +449,7 @@ namespace NetCoreServer
                 {
                     // Async receive with the receive handler
                     _receiving = true;
-                    _receiveEventArg.SetBuffer(_receiveBuffer.Data, 0, (int)_receiveBuffer.Capacity);
+                    _receiveEventArg.SetBuffer(_receiveBuffer.Data);
                     if (!Socket.ReceiveAsync(_receiveEventArg))
                         process = ProcessReceive(_receiveEventArg);
                 }
@@ -494,7 +509,7 @@ namespace NetCoreServer
                 try
                 {
                     // Async write with the write handler
-                    _sendEventArg.SetBuffer(_sendBufferFlush.Data, (int)_sendBufferFlushOffset, (int)(_sendBufferFlush.Size - _sendBufferFlushOffset));
+                    _sendEventArg.SetBuffer(_sendBufferFlush.Contents);
                     if (!Socket.SendAsync(_sendEventArg))
                         process = ProcessSend(_sendEventArg);
                 }
@@ -557,7 +572,7 @@ namespace NetCoreServer
             if (!IsConnected)
                 return false;
 
-            long size = e.BytesTransferred;
+            var size = e.BytesTransferred;
 
             // Received some data from the client
             if (size > 0)
@@ -567,8 +582,8 @@ namespace NetCoreServer
                 Interlocked.Add(ref Server._bytesReceived, size);
 
                 // Call the buffer received handler
-                OnReceived(_receiveBuffer.Data, 0, size);
-
+                OnReceived(_receiveBuffer.Data.Slice(0, size));
+                /*
                 // If the receive buffer is full increase its size
                 if (_receiveBuffer.Capacity == size)
                 {
@@ -581,7 +596,7 @@ namespace NetCoreServer
                     }
 
                     _receiveBuffer.Reserve(2 * size);
-                }
+                }*/
             }
 
             _receiving = false;
@@ -679,6 +694,7 @@ namespace NetCoreServer
         /// Notification is called when another chunk of buffer was received from the client
         /// </remarks>
         protected virtual void OnReceived(byte[] buffer, long offset, long size) {}
+        protected virtual void OnReceived(ReadOnlyMemory<byte> data) {}
         /// <summary>
         /// Handle buffer sent notification
         /// </summary>

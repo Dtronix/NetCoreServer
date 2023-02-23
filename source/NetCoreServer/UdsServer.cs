@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using NetCoreServer.Configs;
 
 namespace NetCoreServer
 {
@@ -12,27 +13,34 @@ namespace NetCoreServer
     /// Unix Domain Socket server is used to connect, disconnect and manage Unix Domain Socket sessions
     /// </summary>
     /// <remarks>Thread-safe</remarks>
-    public class UdsServer : IDisposable
+    internal class UdsServer : IDisposable
     {
+        private readonly UdsServerContext _context;
+
+        public UdsServer(UdsServerContext context) : this(context.UdsEndpoint)
+        {
+            _context = context;
+            Id = context.GetNewSessionId();
+        }
         /// <summary>
         /// Initialize Unix Domain Socket server with a given socket path
         /// </summary>
         /// <param name="path">Socket path</param>
-        public UdsServer(string path) : this(new UnixDomainSocketEndPoint(path)) {}
+        private UdsServer(string path) : this(new UnixDomainSocketEndPoint(path)) {}
         /// <summary>
         /// Initialize Unix Domain Socket server with a given Unix Domain Socket endpoint
         /// </summary>
         /// <param name="endpoint">Unix Domain Socket endpoint</param>
-        public UdsServer(UnixDomainSocketEndPoint endpoint)
+        private UdsServer(UnixDomainSocketEndPoint endpoint)
         {
-            Id = Guid.NewGuid();
+            //Id = Guid.NewGuid();
             Endpoint = endpoint;
         }
 
         /// <summary>
         /// Server Id
         /// </summary>
-        public Guid Id { get; }
+        public long Id { get; }
 
         /// <summary>
         /// Endpoint
@@ -62,15 +70,15 @@ namespace NetCoreServer
         /// <remarks>
         /// This option will set the listening socket's backlog size
         /// </remarks>
-        public int OptionAcceptorBacklog { get; set; } = 1024;
+        public int OptionAcceptorBacklog => _context.AcceptorBacklog;
         /// <summary>
         /// Option: receive buffer size
         /// </summary>
-        public int OptionReceiveBufferSize { get; set; } = 8192;
+        public int OptionReceiveBufferSize => _context.SendReceiveBufferSize;
         /// <summary>
         /// Option: send buffer size
         /// </summary>
-        public int OptionSendBufferSize { get; set; } = 8192;
+        public int OptionSendBufferSize => _context.SendReceiveBufferSize;
 
         #region Start/Stop server
 
@@ -283,7 +291,7 @@ namespace NetCoreServer
         #region Session management
 
         // Server sessions
-        protected readonly ConcurrentDictionary<Guid, UdsSession> Sessions = new ConcurrentDictionary<Guid, UdsSession>();
+        protected readonly ConcurrentDictionary<long, UdsSession> Sessions = new ConcurrentDictionary<long, UdsSession>();
 
         /// <summary>
         /// Disconnect all connected sessions
@@ -306,7 +314,7 @@ namespace NetCoreServer
         /// </summary>
         /// <param name="id">Session Id</param>
         /// <returns>Session with a given Id or null if the session it not connected</returns>
-        public UdsSession FindSession(Guid id)
+        public UdsSession FindSession(long id)
         {
             // Try to find the required session
             return Sessions.TryGetValue(id, out UdsSession result) ? result : null;
@@ -326,7 +334,7 @@ namespace NetCoreServer
         /// Unregister session by Id
         /// </summary>
         /// <param name="id">Session Id</param>
-        internal void UnregisterSession(Guid id)
+        internal void UnregisterSession(long id)
         {
             // Unregister session by Id
             Sessions.TryRemove(id, out UdsSession _);
