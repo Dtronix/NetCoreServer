@@ -14,19 +14,19 @@ namespace NetCoreServer
     /// <remarks>Thread-safe</remarks>
     internal class UdsClient : IDisposable
     {
-        private readonly UdsClientContext _context;
+        private readonly UdsClientConfig _config;
 
         /// <summary>
         /// Initialize Unix Domain Socket client.
         /// </summary>
-        public UdsClient(UdsClientContext context)
-            : this(context.UdsEndpoint)
+        public UdsClient(UdsClientConfig config)
+            : this(config.UdsEndpoint)
         {
-            _context = context;
-            Id = context.GetNewSessionId();
-            if (!_context.MemoryPool.TryRent(out _receiveBuffer) ||
-                !_context.MemoryPool.TryRent(out _sendBufferMain) ||
-                !_context.MemoryPool.TryRent(out _sendBufferFlush))
+            _config = config;
+            Id = config.GetNewSessionId();
+            if (!_config.MemoryPool.TryRent(out _receiveBuffer) ||
+                !_config.MemoryPool.TryRent(out _sendBufferMain) ||
+                !_config.MemoryPool.TryRent(out _sendBufferFlush))
                 throw new InvalidOperationException("Memory pool depleted.");
         }
 
@@ -79,19 +79,19 @@ namespace NetCoreServer
         /// <summary>
         /// Option: receive buffer limit
         /// </summary>
-        public int OptionReceiveBufferLimit => _context.SendReceiveBufferSize;
+        public int OptionReceiveBufferLimit => _config.SendReceiveBufferSize;
         /// <summary>
         /// Option: receive buffer size
         /// </summary>
-        public int OptionReceiveBufferSize => _context.SendReceiveBufferSize;
+        public int OptionReceiveBufferSize => _config.SendReceiveBufferSize;
         /// <summary>
         /// Option: send buffer limit
         /// </summary>
-        public int OptionSendBufferLimit => _context.SendReceiveBufferSize;
+        public int OptionSendBufferLimit => _config.SendReceiveBufferSize;
         /// <summary>
         /// Option: send buffer size
         /// </summary>
-        public int OptionSendBufferSize => _context.SendReceiveBufferSize;
+        public int OptionSendBufferSize => _config.SendReceiveBufferSize;
 
         #region Connect/Disconnect client
 
@@ -464,7 +464,7 @@ namespace NetCoreServer
             lock (_sendLock)
             {
                 // Check the send buffer limit
-                if (((_sendBufferMain.Size + buffer.Length) > _context.SendReceiveBufferSize))
+                if (((_sendBufferMain.Size + buffer.Length) > _config.SendReceiveBufferSize))
                 {
                     SendError(SocketError.NoBufferSpaceAvailable);
                     return false;
@@ -505,7 +505,7 @@ namespace NetCoreServer
             lock (_sendLock)
             {
                 // Check the send buffer limit
-                if (((_sendBufferMain.Size + buffer.Length) > _context.SendReceiveBufferSize))
+                if (((_sendBufferMain.Size + buffer.Length) > _config.SendReceiveBufferSize))
                 {
                     SendError(SocketError.NoBufferSpaceAvailable);
                     return false;

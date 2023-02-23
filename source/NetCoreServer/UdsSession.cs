@@ -12,12 +12,12 @@ namespace NetCoreServer
     /// <remarks>Thread-safe</remarks>
     internal class UdsSession : IDisposable
     {
-        private readonly UdsServerContext _context;
-        public UdsSession(UdsServerContext context, UdsServer server)
+        private readonly UdsServerConfig _config;
+        public UdsSession(UdsServerConfig config, UdsServer server)
         {
-            _context = context;
+            _config = config;
             Server = server;
-            Id = context.GetNewSessionId();
+            Id = config.GetNewSessionId();
         }
         /*
         /// <summary>
@@ -66,20 +66,20 @@ namespace NetCoreServer
         /// <summary>
         /// Option: receive buffer limit
         /// </summary>
-        public int OptionReceiveBufferLimit => _context.SendReceiveBufferSize;
+        public int OptionReceiveBufferLimit => _config.SendReceiveBufferSize;
 
         /// <summary>
         /// Option: receive buffer size
         /// </summary>
-        public int OptionReceiveBufferSize => _context.SendReceiveBufferSize;
+        public int OptionReceiveBufferSize => _config.SendReceiveBufferSize;
         /// <summary>
         /// Option: send buffer limit
         /// </summary>
-        public int OptionSendBufferLimit => _context.SendReceiveBufferSize;
+        public int OptionSendBufferLimit => _config.SendReceiveBufferSize;
         /// <summary>
         /// Option: send buffer size
         /// </summary>
-        public int OptionSendBufferSize => _context.SendReceiveBufferSize;
+        public int OptionSendBufferSize => _config.SendReceiveBufferSize;
 
         #region Connect/Disconnect session
 
@@ -104,9 +104,9 @@ namespace NetCoreServer
             _sendBufferMain = new Buffer();
             _sendBufferFlush = new Buffer();
             */
-            if (!_context.MemoryPool.TryRent(out _receiveBuffer) ||
-                !_context.MemoryPool.TryRent(out _sendBufferMain) ||
-                !_context.MemoryPool.TryRent(out _sendBufferFlush))
+            if (!_config.MemoryPool.TryRent(out _receiveBuffer) ||
+                !_config.MemoryPool.TryRent(out _sendBufferMain) ||
+                !_config.MemoryPool.TryRent(out _sendBufferFlush))
                 throw new InvalidOperationException("Memory pool depleted.");
 
             // Setup event args

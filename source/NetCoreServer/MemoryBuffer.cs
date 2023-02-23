@@ -80,7 +80,6 @@ internal class MemoryBuffer<T>
     /// <returns>Count of append bytes</returns>
     public int Append(in ReadOnlySpan<T> buffer)
     {
-        
         buffer.CopyTo(_data.Span.Slice(_size));
         _size += buffer.Length;
         return buffer.Length;

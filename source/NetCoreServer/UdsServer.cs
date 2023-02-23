@@ -15,12 +15,12 @@ namespace NetCoreServer
     /// <remarks>Thread-safe</remarks>
     internal class UdsServer : IDisposable
     {
-        private readonly UdsServerContext _context;
+        private readonly UdsServerConfig _config;
 
-        public UdsServer(UdsServerContext context) : this(context.UdsEndpoint)
+        public UdsServer(UdsServerConfig config) : this(config.UdsEndpoint)
         {
-            _context = context;
-            Id = context.GetNewSessionId();
+            _config = config;
+            Id = config.GetNewSessionId();
         }
         /// <summary>
         /// Initialize Unix Domain Socket server with a given socket path
@@ -70,15 +70,15 @@ namespace NetCoreServer
         /// <remarks>
         /// This option will set the listening socket's backlog size
         /// </remarks>
-        public int OptionAcceptorBacklog => _context.AcceptorBacklog;
+        public int OptionAcceptorBacklog => _config.AcceptorBacklog;
         /// <summary>
         /// Option: receive buffer size
         /// </summary>
-        public int OptionReceiveBufferSize => _context.SendReceiveBufferSize;
+        public int OptionReceiveBufferSize => _config.SendReceiveBufferSize;
         /// <summary>
         /// Option: send buffer size
         /// </summary>
-        public int OptionSendBufferSize => _context.SendReceiveBufferSize;
+        public int OptionSendBufferSize => _config.SendReceiveBufferSize;
 
         #region Start/Stop server
 

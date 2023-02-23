@@ -2,7 +2,7 @@
 
 namespace NetCoreServer.Configs;
 
-internal abstract class ContextBase
+public abstract class ConfigBase
 {
     private long _sessionCounter = 0;
 
@@ -11,12 +11,12 @@ internal abstract class ContextBase
     /// </summary>
     public int SendReceiveBufferSize { get; }
 
-    public MemoryBufferPool<byte> MemoryPool { get; }
+    internal MemoryBufferPool<byte> MemoryPool { get; }
 
-    protected ContextBase(int sendReceiveBufferSize, int maxBufferCount)
+    protected ConfigBase(int sendReceiveBufferSize, int maxBufferCount)
     {
         SendReceiveBufferSize = sendReceiveBufferSize;
-        MemoryPool = new MemoryBufferPool<byte>(sendReceiveBufferSize, 3);
+        MemoryPool = new MemoryBufferPool<byte>(sendReceiveBufferSize, maxBufferCount);
     }
 
     public long GetNewSessionId()

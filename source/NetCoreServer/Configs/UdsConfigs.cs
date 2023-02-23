@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace NetCoreServer.Configs;
 
-internal sealed class UdsClientContext : ContextBase
+public sealed class UdsClientConfig : ConfigBase
 {
     private readonly UnixDomainSocketEndPoint _udsEndpoint;
 
@@ -18,13 +18,13 @@ internal sealed class UdsClientContext : ContextBase
     }
 
 
-    public UdsClientContext(int sendReceiveBufferSize)
+    public UdsClientConfig(int sendReceiveBufferSize)
         : base(sendReceiveBufferSize, 3)
     {
     }
 }
 
-internal sealed class UdsServerContext : ContextBase
+public sealed class UdsServerConfig : ConfigBase
 {
     private readonly UnixDomainSocketEndPoint _udsEndpoint;
 
@@ -42,7 +42,7 @@ internal sealed class UdsServerContext : ContextBase
         init => _udsEndpoint = value;
     }
 
-    public UdsServerContext(int sendReceiveBufferSize, int maxBufferCount) 
+    public UdsServerConfig(int sendReceiveBufferSize, int maxBufferCount) 
         : base(sendReceiveBufferSize, maxBufferCount)
     {
     }
