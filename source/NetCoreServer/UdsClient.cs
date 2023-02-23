@@ -24,6 +24,11 @@ namespace NetCoreServer
         {
             _config = config;
             _events = config.Events;
+
+            if (!_config.MemoryPool.TryRent(out _receiveBuffer) ||
+                !_config.MemoryPool.TryRent(out _sendBufferMain) ||
+                !_config.MemoryPool.TryRent(out _sendBufferFlush))
+                throw new InvalidOperationException("Memory pool depleted.");
         }
 
         /// <summary>
@@ -301,10 +306,6 @@ namespace NetCoreServer
             _sendBufferMain = new Buffer();
             _sendBufferFlush = new Buffer();
             */
-            if (!_config.MemoryPool.TryRent(out _receiveBuffer) ||
-                !_config.MemoryPool.TryRent(out _sendBufferMain) ||
-                !_config.MemoryPool.TryRent(out _sendBufferFlush))
-                throw new InvalidOperationException("Memory pool depleted.");
 
             // Setup event args
             _connectEventArg = new SocketAsyncEventArgs();
@@ -842,6 +843,7 @@ namespace NetCoreServer
                 _sendBufferFlush.AddOffset(size);
 
                 // Successfully send the whole flush buffer
+                //if (_sendBufferFlushOffset == _sendBufferFlush.Size)
                 if (_sendBufferFlush.Offset == _sendBufferFlush.Size)
                 {
                     // Clear the flush buffer
@@ -991,6 +993,12 @@ namespace NetCoreServer
                     DisconnectAsync();
                 }
 
+                _receiveBuffer.ReturnToPool();
+                _receiveBuffer = null;
+                _sendBufferMain.ReturnToPool();
+                _sendBufferMain = null;
+                _sendBufferFlush.ReturnToPool();
+                _sendBufferFlush = null;
                 // Dispose unmanaged resources here...
 
                 // Set large fields to null here...

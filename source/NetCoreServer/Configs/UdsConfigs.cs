@@ -16,6 +16,12 @@ internal sealed class UdsClientConfig : ClientConfigBase
         get => _udsEndpoint;
         init => _udsEndpoint = value;
     }
+
+
+    public UdsClientConfig(int sendReceiveBufferSize)
+        : base(sendReceiveBufferSize)
+    {
+    }
 }
 
 internal sealed class UdsServerConfig : ServerConfigBase<UdsSession>
@@ -26,5 +32,10 @@ internal sealed class UdsServerConfig : ServerConfigBase<UdsSession>
     {
         get => _udsEndpoint;
         init => _udsEndpoint = value;
+    }
+
+    public UdsServerConfig(int sendReceiveBufferSize, int maxBufferCount) 
+        : base(sendReceiveBufferSize, maxBufferCount)
+    {
     }
 }

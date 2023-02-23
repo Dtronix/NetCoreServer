@@ -32,7 +32,7 @@ internal class MemoryBufferPool<T>
             if (index > _maxBuffers)
                 return false;
 
-            buffer = new MemoryBuffer<T>(this, new Memory<T>(_buffer, index * _bufferSize, _bufferSize))
+            buffer = new MemoryBuffer<T>(this, new Memory<T>(_buffer, index * _bufferSize, _bufferSize));
         }
 
         return true;

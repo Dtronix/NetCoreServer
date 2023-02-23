@@ -9,13 +9,17 @@ internal class ServerEvents<TSession>
     internal readonly Action? OnStartedInternal;
     internal readonly Action? OnStoppingInternal;
     internal readonly Action? OnStoppedInternal;
-    internal readonly SessionDelegate? OnConnectingInternal;
-    internal readonly SessionDelegate? OnConnectedInternal;
-    internal readonly SessionDelegate? OnDisconnectingInternal;
-    internal readonly SessionDelegate? OnDisconnectedInternal;
     internal readonly OnErrorDelegate? OnErrorInternal;
     internal readonly OnErrorDelegate? OnSendErrorInternal;
+    internal readonly SessionDelegate? OnSessionConnectingInternal;
+    internal readonly SessionDelegate? OnSessionConnectedInternal;
+    internal readonly SessionDelegate? OnSessionDisconnectingInternal;
+    internal readonly SessionDelegate? OnSessionDisconnectedInternal;
+    internal readonly SessionDelegate? OnSessionEmptyInternal;
+    internal readonly OnSessionErrorDelegate? OnSessionErrorInternal;
+    internal readonly OnSessionErrorDelegate? OnSessionSendErrorInternal;
     internal readonly SessionCreateDelegate? CreateSessionInternal;
+    internal readonly Received OnSessionReceivedInternal;
 
     /// <summary>
     /// Handle buffer received notification
@@ -23,10 +27,10 @@ internal class ServerEvents<TSession>
     /// <remarks>
     /// Notification is called when another chunk of buffer was received from the server
     /// </remarks>
-    public delegate void Received(Memory<byte> data);
+    public delegate void Received(TSession session, ReadOnlyMemory<byte> readOnlyMemory);
 
     public delegate void Disconnect(SocketError error);
-
+    
     /// <summary>
     /// Handle buffer sent notification
     /// </summary>
@@ -47,6 +51,7 @@ internal class ServerEvents<TSession>
     /// </summary>
     /// <param name="error">Socket error code</param>
     public delegate void OnErrorDelegate(SocketError error);
+    public delegate void OnSessionErrorDelegate(TSession session, SocketError error);
 
     /// <summary>
     /// Handle error notification
@@ -91,42 +96,6 @@ internal class ServerEvents<TSession>
     }
 
     /// <summary>
-    /// Handle session connecting notification
-    /// </summary>
-    public SessionDelegate? OnConnecting
-    {
-        get => OnConnectingInternal;
-        init => OnConnectingInternal = value;
-    }
-
-    /// <summary>
-    /// Handle session connected notification
-    /// </summary>
-    public SessionDelegate? OnConnected
-    {
-        get => OnConnectedInternal;
-        init => OnConnectedInternal = value;
-    }
-
-    /// <summary>
-    /// Handle session disconnecting notification
-    /// </summary>
-    public SessionDelegate? OnDisconnecting
-    {
-        get => OnDisconnectingInternal;
-        init => OnDisconnectingInternal = value;
-    }
-
-    /// <summary>
-    /// Handle session disconnected notification
-    /// </summary>
-    public SessionDelegate? OnDisconnected
-    {
-        get => OnDisconnectedInternal;
-        init => OnDisconnectedInternal = value;
-    }
-
-    /// <summary>
     /// Handle server stopped notification
     /// </summary>
     public OnErrorDelegate? OnError
@@ -135,6 +104,47 @@ internal class ServerEvents<TSession>
         init => OnErrorInternal = value;
     }
 
+    /// <summary>
+    /// Handle session connecting notification
+    /// </summary>
+    public SessionDelegate? OnSessionConnecting
+    {
+        get => OnSessionConnectingInternal;
+        init => OnSessionConnectingInternal = value;
+    }
+
+    /// <summary>
+    /// Handle session connected notification
+    /// </summary>
+    public SessionDelegate? OnSessionConnected
+    {
+        get => OnSessionConnectedInternal;
+        init => OnSessionConnectedInternal = value;
+    }
+
+    /// <summary>
+    /// Handle session disconnecting notification
+    /// </summary>
+    public SessionDelegate? OnSessionDisconnecting
+    {
+        get => OnSessionDisconnectingInternal;
+        init => OnSessionDisconnectingInternal = value;
+    }
+
+    /// <summary>
+    /// Handle session disconnected notification
+    /// </summary>
+    public SessionDelegate? OnSessionDisconnected
+    {
+        get => OnSessionDisconnectedInternal;
+        init => OnSessionDisconnectedInternal = value;
+    }
+
+    public SessionDelegate? OnSessionEmpty
+    {
+        get => OnSessionEmptyInternal;
+        init => OnSessionEmptyInternal = value;
+    }
 
     /// <summary>
     /// Handle server stopped notification
@@ -144,7 +154,25 @@ internal class ServerEvents<TSession>
         get => OnSendErrorInternal;
         init => OnSendErrorInternal = value;
     }
-    
+
+    public OnSessionErrorDelegate? OnSessionError
+    {
+        get => OnSessionErrorInternal;
+        init => OnSessionErrorInternal = value;
+    }
+
+    public OnSessionErrorDelegate? OnSessionSendError
+    {
+        get => OnSessionSendErrorInternal;
+        init => OnSessionSendErrorInternal = value;
+    }
+
+    public Received OnSessionReceived
+    {
+        get => OnSessionReceivedInternal;
+        init => OnSessionReceivedInternal = value;
+    }
+
     public SessionCreateDelegate? SessionCreate
     {
         get => CreateSessionInternal;

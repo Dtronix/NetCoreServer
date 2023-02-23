@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -130,11 +130,12 @@ namespace NetCoreServer
             BytesReceived = 0;
 
             // Call the session connecting handler
-            OnConnecting();
+            //OnConnecting();
+            _events.OnSessionConnectingInternal?.Invoke(this);
 
             // Call the session connecting handler in the server
             //Server.OnConnectingInternal(this);
-            _events.OnConnectingInternal?.Invoke(this);
+            _events.OnSessionConnectingInternal?.Invoke(this);
 
             // Update the connected flag
             IsConnected = true;
@@ -147,15 +148,19 @@ namespace NetCoreServer
                 return;
 
             // Call the session connected handler
-            OnConnected();
+            //OnConnected();
+            _events.OnSessionConnectingInternal?.Invoke(this);
 
             // Call the session connected handler in the server
             //Server.OnConnectedInternal(this);
-            _events.OnConnectedInternal?.Invoke(this);
+            _events.OnSessionConnectedInternal?.Invoke(this);
 
             // Call the empty send buffer handler
             if (_sendBufferMain.IsEmpty)
-                OnEmpty();
+            {
+                //OnEmpty();
+                _events.OnSessionEmptyInternal?.Invoke(this);
+            }
         }
 
         /// <summary>
@@ -172,11 +177,12 @@ namespace NetCoreServer
             _sendEventArg.Completed -= OnAsyncCompleted;
 
             // Call the session disconnecting handler
-            OnDisconnecting();
+            //OnDisconnecting();
+            //_events.OnSessionDisconnectingInternal?.Invoke(this);
 
             // Call the session disconnecting handler in the server
             //Server.OnDisconnectingInternal(this);
-            _events.OnDisconnectingInternal?.Invoke(this);
+            _events.OnSessionDisconnectingInternal?.Invoke(this);
 
             try
             {
@@ -213,11 +219,11 @@ namespace NetCoreServer
             ClearBuffers();
 
             // Call the session disconnected handler
-            OnDisconnected();
+            //OnDisconnected();
 
             // Call the session disconnected handler in the server
             //Server.OnDisconnectedInternal(this);
-            _events.OnDisconnected?.Invoke(this);
+            _events.OnSessionDisconnected?.Invoke(this);
 
             // Unregister session
             Server.UnregisterSession(Id);
@@ -239,7 +245,7 @@ namespace NetCoreServer
         private MemoryBuffer<byte> _sendBufferMain;
         private MemoryBuffer<byte> _sendBufferFlush;
         private SocketAsyncEventArgs _sendEventArg;
-        private long _sendBufferFlushOffset;
+        //private long _sendBufferFlushOffset;
         /*
         /// <summary>
         /// Send data to the client (synchronous)
@@ -487,7 +493,7 @@ namespace NetCoreServer
                     {
                         // Swap flush and main buffers
                         _sendBufferFlush = Interlocked.Exchange(ref _sendBufferMain, _sendBufferFlush);
-                        _sendBufferFlushOffset = 0;
+                        //_sendBufferFlushOffset = 0;
 
                         // Update statistic
                         BytesPending = 0;
@@ -510,7 +516,8 @@ namespace NetCoreServer
                 // Call the empty send buffer handler
                 if (empty)
                 {
-                    OnEmpty();
+                    //OnEmpty();
+                    _events.OnSessionEmptyInternal?.Invoke(this);
                     return;
                 }
 
@@ -536,7 +543,7 @@ namespace NetCoreServer
                 // Clear send buffers
                 _sendBufferMain.Clear();
                 _sendBufferFlush.Clear();
-                _sendBufferFlushOffset= 0;
+                //_sendBufferFlushOffset= 0;
 
                 // Update statistic
                 BytesPending = 0;
@@ -581,18 +588,19 @@ namespace NetCoreServer
             if (!IsConnected)
                 return false;
 
-            long size = e.BytesTransferred;
+            var size = e.BytesTransferred;
 
             // Received some data from the client
             if (size > 0)
             {
                 // Update statistic
                 BytesReceived += size;
-                Interlocked.Add(ref Server._bytesReceived, size);
+                //Interlocked.Add(ref Server._bytesReceived, size);
 
                 // Call the buffer received handler
-                OnReceived(_receiveBuffer.Data, 0, size);
-
+                //OnReceived(_receiveBuffer.Data, 0, size);
+                _events.OnSessionReceivedInternal.Invoke(this, e.MemoryBuffer.Slice(0, size));
+                /*
                 // If the receive buffer is full increase its size
                 if (_receiveBuffer.Capacity == size)
                 {
@@ -605,7 +613,7 @@ namespace NetCoreServer
                     }
 
                     _receiveBuffer.Reserve(2 * size);
-                }
+                }*/
             }
 
             _receiving = false;
@@ -636,7 +644,7 @@ namespace NetCoreServer
             if (!IsConnected)
                 return false;
 
-            long size = e.BytesTransferred;
+            var size = e.BytesTransferred;
 
             // Send some data to the client
             if (size > 0)
@@ -644,21 +652,23 @@ namespace NetCoreServer
                 // Update statistic
                 BytesSending -= size;
                 BytesSent += size;
-                Interlocked.Add(ref Server._bytesSent, size);
+                //Interlocked.Add(ref Server._bytesSent, size);
 
                 // Increase the flush buffer offset
-                _sendBufferFlushOffset += size;
+                //_sendBufferFlushOffset += size;
+                _sendBufferFlush.AddOffset(size);
 
                 // Successfully send the whole flush buffer
-                if (_sendBufferFlushOffset == _sendBufferFlush.Size)
+                if (_sendBufferFlush.Offset == _sendBufferFlush.Size)
                 {
                     // Clear the flush buffer
                     _sendBufferFlush.Clear();
-                    _sendBufferFlushOffset = 0;
+                    //_sendBufferFlushOffset = 0;
                 }
 
                 // Call the buffer sent handler
-                OnSent(size, BytesPending + BytesSending);
+                //OnSent(size, BytesPending + BytesSending);
+
             }
 
             // Try to send again if the session is valid
@@ -675,7 +685,7 @@ namespace NetCoreServer
         #endregion
 
         #region Session handlers
-
+        /*
         /// <summary>
         /// Handle client connecting notification
         /// </summary>
@@ -728,7 +738,7 @@ namespace NetCoreServer
         /// </summary>
         /// <param name="error">Socket error code</param>
         protected virtual void OnError(SocketError error) {}
-
+        */
         #endregion
 
         #region Error handling
@@ -739,6 +749,7 @@ namespace NetCoreServer
         /// <param name="error">Socket error code</param>
         private void SendError(SocketError error)
         {
+            _events.OnSessionSendErrorInternal?.Invoke(this, error);
             // Skip disconnect errors
             if ((error == SocketError.ConnectionAborted) ||
                 (error == SocketError.ConnectionRefused) ||
@@ -747,7 +758,9 @@ namespace NetCoreServer
                 (error == SocketError.Shutdown))
                 return;
 
-            OnError(error);
+            //OnError(error);
+            _events.OnSessionErrorInternal?.Invoke(this, error);
+
         }
 
         #endregion
@@ -771,7 +784,7 @@ namespace NetCoreServer
             GC.SuppressFinalize(this);
         }
 
-        protected virtual void Dispose(bool disposingManagedResources)
+        private void Dispose(bool disposingManagedResources)
         {
             // The idea here is that Dispose(Boolean) knows whether it is
             // being called to do explicit cleanup (the Boolean is true)
