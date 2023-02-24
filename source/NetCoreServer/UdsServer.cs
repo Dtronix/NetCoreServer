@@ -5,15 +5,18 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using NetCoreServer.Configs;
 
+#if DTRONIX_IPC
+namespace DtronixIpc.Transports.Foundation
+#else
 namespace NetCoreServer
+#endif
 {
     /// <summary>
     /// Unix Domain Socket server is used to connect, disconnect and manage Unix Domain Socket sessions
     /// </summary>
     /// <remarks>Thread-safe</remarks>
-    internal class UdsServer : IDisposable
+    internal abstract class UdsServer : IDisposable
     {
         private readonly UdsServerConfig _config;
 
@@ -284,7 +287,7 @@ namespace NetCoreServer
         /// Create Unix Domain Socket session factory method
         /// </summary>
         /// <returns>Unix Domain Socket session</returns>
-        protected virtual UdsSession CreateSession() { return new UdsSession(this); }
+        protected abstract UdsSession CreateSession();
 
         #endregion
 
@@ -414,7 +417,7 @@ namespace NetCoreServer
         /// Handle server stopped notification
         /// </summary>
         protected virtual void OnStopped() {}
-
+        
         /// <summary>
         /// Handle session connecting notification
         /// </summary>
@@ -435,18 +438,18 @@ namespace NetCoreServer
         /// </summary>
         /// <param name="session">Disconnected session</param>
         protected virtual void OnDisconnected(UdsSession session) {}
-
+        
         /// <summary>
         /// Handle error notification
         /// </summary>
         /// <param name="error">Socket error code</param>
         protected virtual void OnError(SocketError error) {}
-
+        
         internal void OnConnectingInternal(UdsSession session) { OnConnecting(session); }
         internal void OnConnectedInternal(UdsSession session) { OnConnected(session); }
         internal void OnDisconnectingInternal(UdsSession session) { OnDisconnecting(session); }
         internal void OnDisconnectedInternal(UdsSession session) { OnDisconnected(session); }
-
+        
         #endregion
 
         #region Error handling

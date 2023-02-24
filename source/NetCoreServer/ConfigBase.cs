@@ -1,6 +1,11 @@
 ﻿using System.Threading;
+using NetCoreServer;
 
-namespace NetCoreServer.Configs;
+#if DTRONIX_IPC
+namespace DtronixIpc.Transports.Foundation;
+#else
+namespace NetCoreServer;
+#endif
 
 public abstract class ConfigBase
 {

@@ -2,7 +2,11 @@
 using System.Collections.Concurrent;
 using System.Threading;
 
+#if DTRONIX_IPC
+namespace DtronixIpc.Transports.Foundation;
+#else
 namespace NetCoreServer;
+#endif
 
 internal class MemoryBufferPool<T>
     where T : struct

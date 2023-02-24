@@ -5,7 +5,11 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace NetCoreServer.Configs;
+#if DTRONIX_IPC
+namespace DtronixIpc.Transports.Foundation;
+#else
+namespace NetCoreServer;
+#endif
 
 public sealed class UdsClientConfig : ConfigBase
 {

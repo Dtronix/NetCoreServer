@@ -2,9 +2,12 @@
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using NetCoreServer.Configs;
 
+#if DTRONIX_IPC
+namespace DtronixIpc.Transports.Foundation
+#else
 namespace NetCoreServer
+#endif
 {
     /// <summary>
     /// Unix Domain Socket session is used to read and write data from the connected Unix Domain Socket client
@@ -332,6 +335,35 @@ namespace NetCoreServer
 
                 // Fill the main send buffer
                 _sendBufferMain.Append(buffer);
+
+                // Update statistic
+                BytesPending = _sendBufferMain.Size;
+
+                // Avoid multiple send handlers
+                if (_sending)
+                    return true;
+                else
+                    _sending = true;
+
+                // Try to send the main buffer
+                TrySend();
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Send data to the server (asynchronous)
+        /// </summary>
+        /// <returns>'true' if the data was successfully sent, 'false' if the client is not connected</returns>
+        public bool SendAsync(Action<ITransportBufferWriter<byte>> writerAction)
+        {
+            if (!IsConnected)
+                return false;
+
+            lock (_sendLock)
+            {
+                writerAction.Invoke(_sendBufferMain);
 
                 // Update statistic
                 BytesPending = _sendBufferMain.Size;
@@ -729,7 +761,7 @@ namespace NetCoreServer
         /// Send error notification
         /// </summary>
         /// <param name="error">Socket error code</param>
-        private void SendError(SocketError error)
+        protected virtual void SendError(SocketError error)
         {
             // Skip disconnect errors
             if ((error == SocketError.ConnectionAborted) ||

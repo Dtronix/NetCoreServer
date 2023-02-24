@@ -4,9 +4,12 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using NetCoreServer.Configs;
 
+#if DTRONIX_IPC
+namespace DtronixIpc.Transports.Foundation
+#else
 namespace NetCoreServer
+#endif
 {
     /// <summary>
     /// Unix Domain Socket client is used to read/write data from/into the connected Unix Domain Socket server
@@ -492,27 +495,15 @@ namespace NetCoreServer
         /// <summary>
         /// Send data to the server (asynchronous)
         /// </summary>
-        /// <param name="buffer">Buffer to send as a span of bytes</param>
         /// <returns>'true' if the data was successfully sent, 'false' if the client is not connected</returns>
-        public bool SendAsync(ReadOnlySequence<byte> buffer)
+        public bool SendAsync(Action<ITransportBufferWriter<byte>> writerAction)
         {
             if (!IsConnected)
                 return false;
 
-            if (buffer.IsEmpty)
-                return true;
-
             lock (_sendLock)
             {
-                // Check the send buffer limit
-                if (((_sendBufferMain.Size + buffer.Length) > _config.SendReceiveBufferSize))
-                {
-                    SendError(SocketError.NoBufferSpaceAvailable);
-                    return false;
-                }
-
-                // Fill the main send buffer
-                _sendBufferMain.Append(buffer);
+                writerAction.Invoke(_sendBufferMain);
 
                 // Update statistic
                 BytesPending = _sendBufferMain.Size;

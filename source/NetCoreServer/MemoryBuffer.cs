@@ -1,12 +1,16 @@
 ﻿using System;
 using System.Buffers;
 
+#if DTRONIX_IPC
+namespace DtronixIpc.Transports.Foundation;
+#else
 namespace NetCoreServer;
+#endif
 
 /// <summary>
 /// Dynamic T buffer
 /// </summary>
-internal class MemoryBuffer<T>
+internal class MemoryBuffer<T> : ITransportBufferWriter<T>
     where T : struct
 {
     private readonly MemoryBufferPool<T> _pool;
@@ -103,5 +107,38 @@ internal class MemoryBuffer<T>
     {
         Clear();
         _pool.Return(this);
+    }
+
+    public void Advance(int count)
+    {
+        if (count > Remaining)
+            throw new OutOfMemoryException("Can't advance past the end of the buffer.");
+
+        _size += count;
+    }
+
+    public Memory<T> GetMemory(int sizeHint = 0)
+    {
+        // Return the maximum buffer size left.
+        if(sizeHint == 0)
+            return _data.Slice(_size, Remaining);
+
+        if (sizeHint > Remaining)
+            throw new OutOfMemoryException("Can't advance past the end of the buffer.");
+
+        return _data.Slice(_size, sizeHint);
+
+    }
+
+    public Span<T> GetSpan(int sizeHint = 0)
+    {
+        // Return the maximum buffer size left.
+        if (sizeHint == 0)
+            return _data.Span.Slice(_size, Remaining);
+
+        if (sizeHint > Remaining)
+            throw new OutOfMemoryException("Can't advance past the end of the buffer.");
+
+        return _data.Span.Slice(_size, sizeHint);
     }
 }
