@@ -22,7 +22,7 @@ public sealed class UdsClientConfig : ConfigBase
     }
 
 
-    public UdsClientConfig(int sendReceiveBufferSize)
+    public UdsClientConfig(int sendReceiveBufferSize = 1024 * 16)
         : base(sendReceiveBufferSize, 3)
     {
     }
@@ -46,7 +46,7 @@ public sealed class UdsServerConfig : ConfigBase
         init => _udsEndpoint = value;
     }
 
-    public UdsServerConfig(int sendReceiveBufferSize, int maxBufferCount) 
+    public UdsServerConfig(int sendReceiveBufferSize = 1024 * 16, int maxBufferCount = 300) 
         : base(sendReceiveBufferSize, maxBufferCount)
     {
     }
