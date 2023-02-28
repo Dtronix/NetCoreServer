@@ -6,13 +6,17 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 
+#if BUILD_NEXNET
+namespace NexNet.Transports.Foundation
+#else
 namespace NetCoreServer
+#endif
 {
     /// <summary>
     /// Unix Domain Socket server is used to connect, disconnect and manage Unix Domain Socket sessions
     /// </summary>
     /// <remarks>Thread-safe</remarks>
-    public class UdsServer : IDisposable
+    internal partial class UdsServer : IDisposable
     {
         /// <summary>
         /// Initialize Unix Domain Socket server with a given socket path
@@ -38,7 +42,7 @@ namespace NetCoreServer
         /// Endpoint
         /// </summary>
         public EndPoint Endpoint { get; private set; }
-
+        /*
         /// <summary>
         /// Number of sessions connected to the server
         /// </summary>
@@ -71,7 +75,7 @@ namespace NetCoreServer
         /// Option: send buffer size
         /// </summary>
         public int OptionSendBufferSize { get; set; } = 8192;
-
+        */
         #region Start/Stop server
 
         // Server acceptor
@@ -189,7 +193,7 @@ namespace NetCoreServer
             catch (ObjectDisposedException) {}
 
             // Disconnect all sessions
-            DisconnectAll();
+            //DisconnectAll();
 
             // Update the started flag
             IsStarted = false;
@@ -243,7 +247,7 @@ namespace NetCoreServer
                 var session = CreateSession();
 
                 // Register the session
-                RegisterSession(session);
+                //RegisterSession(session);
 
                 // Connect new session
                 session.Connect(e.AcceptSocket);
@@ -281,7 +285,7 @@ namespace NetCoreServer
         #endregion
 
         #region Session management
-
+        /*
         // Server sessions
         protected readonly ConcurrentDictionary<Guid, UdsSession> Sessions = new ConcurrentDictionary<Guid, UdsSession>();
 
@@ -385,7 +389,7 @@ namespace NetCoreServer
         /// <param name="text">Text to multicast as a span of characters</param>
         /// <returns>'true' if the text was successfully multicasted, 'false' if the text was not multicasted</returns>
         public virtual bool Multicast(ReadOnlySpan<char> text) => Multicast(Encoding.UTF8.GetBytes(text.ToArray()));
-
+        */
         #endregion
 
         #region Server handlers
