@@ -8,13 +8,7 @@ namespace NetCoreServer;
 
 public sealed class UdsClientConfig : ConfigBase
 {
-    private readonly UnixDomainSocketEndPoint _udsEndpoint;
-
-    public UnixDomainSocketEndPoint UdsEndpoint
-    {
-        get => _udsEndpoint;
-        init => _udsEndpoint = value;
-    }
+    public required UnixDomainSocketEndPoint UdsEndpoint { get; init; }
 
 
     public UdsClientConfig(int sendReceiveBufferSize = 1024 * 16)
@@ -25,8 +19,6 @@ public sealed class UdsClientConfig : ConfigBase
 
 public sealed class UdsServerConfig : ConfigBase
 {
-    private readonly UnixDomainSocketEndPoint _udsEndpoint;
-
     /// <summary>
     /// Option: acceptor backlog size
     /// </summary>
@@ -35,11 +27,7 @@ public sealed class UdsServerConfig : ConfigBase
     /// </remarks>
     public int AcceptorBacklog { get; init; } = 1024;
 
-    public UnixDomainSocketEndPoint UdsEndpoint
-    {
-        get => _udsEndpoint;
-        init => _udsEndpoint = value;
-    }
+    public required UnixDomainSocketEndPoint UdsEndpoint { get; init; }
 
     public UdsServerConfig(int sendReceiveBufferSize = 1024 * 16, int maxBufferCount = 300) 
         : base(sendReceiveBufferSize, maxBufferCount)
